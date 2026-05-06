@@ -1,5 +1,5 @@
 # Előfeltételek
- 1. Fejlsztői kofiguráció:AMD Ryzen 5 4600h, Nvidia GeForce GTX 1650 Ti Mobile, 16Gb Memória, 60 Gb szabad tárhely(az operációs rendszerrel egyyüttes tárhely)
+ 1. Fejlsztői kofiguráció: AMD Ryzen 5 4600h, Nvidia GeForce GTX 1650 Ti Mobile, 16Gb Memória, 60 Gb szabad tárhely(az operációs rendszerrel egyyüttes tárhely)
  2. Ubuntu 22.04.5 rendszeren indítható el kizárólag a szimuláció
 
 # Telepítés
@@ -37,8 +37,8 @@ Ezek azért szükségesek mivel leválasztottam a gazebo szerveréről a projekt
 ## Paraméterek
 A tanítás sikerességéhez szükség lesz időnként változtatni a PPO algoritmus hiperparaméterein, amikre főként ügyelni kell a következők:
 
-+ learning_rate:Ez adaja meg mennyire gyorsan tanul a rendszer
-+ n_steps:Azt mutatja mennyi lépést tesz meg mielőtt mentene a rendszer, növelni érdemes amikor egy epizód kb a felét éri el az n_steps-nek
++ learning_rate: Ez adaja meg mennyire gyorsan tanul a rendszer
++ n_steps: Azt mutatja mennyi lépést tesz meg mielőtt mentene a rendszer, növelni érdemes amikor egy epizód kb a felét éri el az n_steps-nek
 + ent_coef: Az explorációért felelős, 0 és 0.05 közötti értékekkel teszteletem a a projektet és stabil fejlődést mutatott 
 
 Minden változtatás után szükséges újra lefordítani a projjektet a fentebb leírt módon.
