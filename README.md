@@ -67,4 +67,7 @@ A tesztelére 2 script szolgál amelyből az egyik a `start_evaluationn.sh`, ami
 ./start_evaluation.sh
 ```
 A másik a `start_testing.sh`, ami a modell számára teljesen ismeretlen pályákon tesztel.
+```
+./start_testing.sh
+```
 Jelenlegi tapasztalataim alapján 1.5-2 milló lépés és hiperparaméter módosítások után fel lehet tanítani a robotot vonal követésre.
