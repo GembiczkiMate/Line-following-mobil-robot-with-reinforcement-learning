@@ -20,7 +20,7 @@ parancsal.
 # Futtatás
 Buildelés után az
 ```
-./auto_traiin_watchdog.sh
+./auto_train_watchdog.sh
 ```
 parancs lefuttatását követően ki kell választanunk a tanulási módot. A kamera kép alapú (1) képfeldolgozással határozza meg a jutalmakat, míga a koordináta alapú (2) a CatMull-Rom Spline pontjai és a robot koordinátája alapján jutalmaz.
 A következő választás a futtatás módja. Az első opció választása esetén látszódni fog a szimuláció viszont jobban megterheli a hardvert, főként debug-ra használatos, amásodig opiónál nem fog elindulni vizuálisan a szimuláció ezzel a tanulás is gyorsabban halad.
@@ -48,12 +48,12 @@ Minden változtatás után szükséges újra lefordítani a projjektet a fentebb
 A robot fejlődésének monitorozására TensorBoardot hasznátam amivel lehet visszamenőleg is ellenőrizni a robot fejlődését. Az első mentés lefutása után egy új terminálban a következő paracsot kell lefuttani, valamint a localhost linkre kattintani az értékek vizsgálatához:
 
 ```
-tensorboard --logrdir ppo_line_follower_vision
+tensorboard --logdir ppo_line_follower_vision
 ```
 a képfeldolgozó módhoz, vagy
 
 ```
-tensorboard --logrdir ppo_line_follower_vision
+tensorboard --logdir ppo_line_follower_vision
 ```
 a koordináta módhoz. Itt a `SCALARS` fülre kattintava és a bal oltalon az `Ignore outliers in chart scaling` pipát kivéve látszódni fognak a gráfok amiből a legfntosabbak:
 + `ep_rew_mean`, ami az epizódonkénti átlag jutamat mutatja
