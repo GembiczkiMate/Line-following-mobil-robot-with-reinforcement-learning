@@ -59,7 +59,7 @@ class GazeboEntityManager:
                 req.state.reference_frame = "world"
                 req.state.pose.position.x = float(spawn_x)
                 req.state.pose.position.y = float(spawn_y)
-                req.state.pose.position.z = 0.1  # Minimum safe height for 0.14m wheels to not clip into the ground
+                req.state.pose.position.z = 0.1 
                 
                 import math
                 cy = math.cos(yaw * 0.5)
@@ -69,7 +69,7 @@ class GazeboEntityManager:
                 req.state.pose.orientation.x = 0.0
                 req.state.pose.orientation.y = 0.0
                 
-                # set velocities to 0 so it doesn't fly away
+                
                 req.state.twist.linear.x = 0.0
                 req.state.twist.linear.y = 0.0
                 req.state.twist.linear.z = 0.0
@@ -102,14 +102,14 @@ class GazeboEntityManager:
                 time.sleep(0.5)
 
         if not success:
-            self.node.get_logger().warn("A C++ szintű gz model CLI teleport sikertelen, használjuk a teljes respawnt!")
+            self.node.get_logger().warn("C++ level gz model CLI teleport failed, using full respawn!")
             return False
             
         return True
 
     def delete_entity(self, name):
-        """Hívja a delete_entity service-t, robosztus újrapróbálkozással és CLI fallback-kel."""
-        # 1. MEGOLDÁS A GZSERVER CRASH-RE: Apró várakozás a hívás előtt, hogy a korábbi C++ callback-ek befejeződjenek
+        
+        
         time.sleep(0.5)
         
         req = DeleteEntity.Request()
@@ -118,7 +118,7 @@ class GazeboEntityManager:
         max_retries = 3
         for attempt in range(max_retries):
             if not self.delete_client.wait_for_service(timeout_sec=2.0):
-                self.node.get_logger().warning(f"DeleteEntity service nem elérhető az rclpy-ben, próbálkozás terminál (CLI) fallback-kel: {name}")
+                self.node.get_logger().warning(f"DeleteEntity service not available in rclpy, attempting terminal (CLI) fallback: {name}")
                 try:
                     cmd = ["ros2", "service", "call", "/delete_entity", "gazebo_msgs/srv/DeleteEntity", f"{{name: '{name}'}}"]
                     res = subprocess.run(cmd, capture_output=True, text=True, timeout=5.0)
@@ -136,27 +136,27 @@ class GazeboEntityManager:
                 if future.result() is not None and future.result().success:
                     return True
                 else:
-                    self.node.get_logger().warning(f"Nem sikerült törölni az entitást: {name} (lehet, hogy már nem is létezik).")
+                    self.node.get_logger().warning(f"Failed to delete entity: {name} (it may no longer exist).")
                     return False
             except Exception as e:
-                self.node.get_logger().error(f"Hiba a delete_entity hívásakor: {e}")
+                self.node.get_logger().error(f"Error calling delete_entity: {e}")
                 time.sleep(1.0)
         
-        self.node.get_logger().error("A DeleteEntity service tartósan nem elérhető!")
+        self.node.get_logger().error("DeleteEntity service is permanently unavailable!")
         
-        # JELZÉS KÜLDÉSE A WATCHDOGNAK, HOGY FULL RESTART KELL!
+
         try:
             with open('/tmp/gazebo_fatal_error.flag', 'w') as f:
-                f.write('FATAL: DeleteEntity tartósan nem elérhető')
+                f.write('FATAL: DeleteEntity service is permanently unavailable')
         except:
             pass
-        os._exit(1) # Azonnal kinyírjuk a python scriptet hibakóddal
+        os._exit(1)
         
         return False
 
     def spawn_entity(self, name, xml, x, y, z, roll=0.0, pitch=0.0, yaw=0.0):
         """Spawn an entity in Gazebo robustly."""
-        # 1. MEGOLDÁS A GZSERVER CRASH-RE: A fizikai motor (Gazebo) ROS2 Pluginjának védeleme az átfedő szerver hívásoktól
+        
         time.sleep(0.5)
         
         req = SpawnEntity.Request()
@@ -178,7 +178,7 @@ class GazeboEntityManager:
         # 1. API attempt
         if self.spawn_client.wait_for_service(timeout_sec=5.0):
             try:
-                # Biztonságosabb, ha pause-olva van a fizika amíg spawn-ol
+                
                 future = self.spawn_client.call_async(req)
                 rclpy.spin_until_future_complete(self.node, future, timeout_sec=15.0)
                 if future.result() is not None and future.result().success:
@@ -186,8 +186,7 @@ class GazeboEntityManager:
             except Exception:
                 pass
                 
-        # 2. NO CLI FALLBACK. Gazebo crashes with exit code -11 if multiple entities spawn during unpaused phases.
-        # Just fail and let it retry gracefully.
+        # 2. CLI fallback
         self.node.get_logger().warn(f"API spawn failed for {name}. Returning False to retry.")
         return False
 
@@ -196,10 +195,6 @@ class GazeboEntityManager:
         max_retries = 3
         
         for attempt in range(max_retries):
-            # Delete existing robot
-            delete_success = self.delete_entity(self.robot_name)
-            time.sleep(1.0)  # Növelt várakozás a stabilitás érdekében (Gazebo takarítás)
-            
             # Read and modify URDF with new camera pitch
             try:
                 with open(self.urdf_path, 'r') as f:
@@ -214,7 +209,7 @@ class GazeboEntityManager:
                     self.robot_name,
                     modified_urdf,
                     spawn_x, spawn_y, 0.2,
-                    yaw=yaw  # Facing requested direction
+                    yaw=yaw  
                 )
                 
                 if success:
@@ -230,7 +225,7 @@ class GazeboEntityManager:
         
         self.node.get_logger().error("Failed to respawn robot after all retries!")
         
-        # JELZÉS KÜLDÉSE A WATCHDOGNAK, HOGY FULL RESTART KELL!
+        
         try:
             with open('/tmp/gazebo_fatal_error.flag', 'w') as f:
                 f.write('FATAL: Respawn limit reached')
@@ -241,11 +236,11 @@ class GazeboEntityManager:
         return False
 
     def respawn_line(self, track_points, spline_resolution, line_width):
-        # Inicializáljuk a memóriában tartott pályákat
+        # inicialize spawned_tracks dictionary on first call
         if not hasattr(self, 'spawned_tracks'):
             self.spawned_tracks = {}
             
-        # Töröljük ki az előző futtatásokból esetlegesen bent maradt pályákat (Néma, Warning-mentes módon)
+        #Deleting the old track (if exists)
         if self.track_version == 0:
             req = DeleteEntity.Request()
             for i in range(1, 5):
@@ -262,15 +257,11 @@ class GazeboEntityManager:
 
         track_hash = hash(str(track_points))
         
-        # MEMÓRIA VÉDELEM KIKACSOLVA: Inkább a memóriában tartjuk a régi pályákat a föld alatt (z=-10)!
-        # A folyamatos DeleteEntity/SpawnEntity futtatások fragmentálják a Gazebo/OGRE memóriáját, ami Exit Code -11 Segfaultot okoz az 5. iterációnál!
-        # Mivel a pályákban csak <visual> tag van, nincs <collision>, nem veszik el a CPU-t!
-        
-        # Ha olyan pályát kér, ami még NINCS a világba lerakva
+        # Only spawn a new track if we haven't seen this exact track configuration before. If we have, just teleport the existing one up and the previously visible one down.
         if track_hash not in self.spawned_tracks:
             self.global_track_counter += 1
             self.line_model_name = f"track_line_{self.global_track_counter}"
-            self.node.get_logger().info(f"Új pálya generálása és parkoltatása: {self.line_model_name}")
+            self.node.get_logger().info(f"Generating and parking new track: {self.line_model_name}")
             
             from gazebo_utils import TrackGenerator
             import math
@@ -290,9 +281,7 @@ class GazeboEntityManager:
                 center_y = (y1 + y2) / 2
                 angle = math.atan2(y2 - y1, x2 - x1)
                 
-                # OPTIMALIZÁCIÓ: Egyetlen Kinematikus linkbe sűrítjük az ÖSSZES vonalszegmenst (visual-ként)!
-                # Mivel ez így 1 db merev testnek számít a Gazebo ODE motorjában, az FPS fagyás eltűnik.
-                # És mivel <kinematic>true</kinematic>, a 'gz model -z' teleportálás esetén is FRISSÜL a kép (szemben a static-kal)!
+                
                 segments_sdf += f'''
           <visual name="visual_{segment_id}">
             <pose>{center_x} {center_y} 0.015 0 0 {angle}</pose>
@@ -310,7 +299,7 @@ class GazeboEntityManager:
           </visual>'''
                 segment_id += 1
             
-            # A modell felépítése - egyetlen kinematic link az egész pálya!
+            # Build the full SDF for the track model with all segments
             sdf = f'''<?xml version="1.0"?>
     <sdf version="1.6">
       <model name="{self.line_model_name}">
@@ -328,7 +317,7 @@ class GazeboEntityManager:
       </model>
     </sdf>'''
             
-            # Alapból MÍNUSZ 10 Méterre, a föld alá nyomjuk be őket "parkolni"
+            # Spawn the new track model underground (z=-10.0) so it's not visible until we teleport it up. This avoids any flickering or physics issues with spawning directly at z=0.0.
             success = self.spawn_entity(self.line_model_name, sdf, 0.0, 0.0, -10.0)
             
             import time
@@ -336,19 +325,17 @@ class GazeboEntityManager:
                 self.spawned_tracks[track_hash] = self.line_model_name
                 time.sleep(0.5) 
             else:
-                self.node.get_logger().warn(f"Sikertelen pálya építés: {self.line_model_name}")
+                self.node.get_logger().warn(f"Failed to build track: {self.line_model_name}")
                 return
 
-        # Ide értve már BIZTOSAN le van generálva az adott pálya (vagy most, vagy korábban)
-        # ÉLŐ Fizika mellett "fel-liftezzük" (teleport) a kiválasztottat a felszínre (z=0.0)
-        # Az összes többi pályát pedig a föld alá küldjük parkolni (z=-10.0)
+        
         from gazebo_msgs.srv import SetEntityState
         
         # Pause during teleportation of kinematic tracks so physics engine doesn't trip up
         for h, model_name in self.spawned_tracks.items():
             target_z = 0.0 if h == track_hash else -10.0
             
-            # Optimization: only teleport the newly requested track and the PREVIOUSLY visible track down! Do not mess with tracks already at -10.
+            # Optimization: only teleport the newly requested track and the PREVIOUSLY visible track down!
             if h != track_hash and h != getattr(self, 'current_visible_track', None):
                 continue
                 
@@ -359,7 +346,7 @@ class GazeboEntityManager:
                     req.state.name = model_name
                     req.state.reference_frame = "world"
                     # Only teleport Z coordinate! 
-                    # Keep X,Y at 0 so we just move it underground!
+                   
                     req.state.pose.position.x = 0.0
                     req.state.pose.position.y = 0.0
                     req.state.pose.position.z = target_z
@@ -392,9 +379,8 @@ class GazeboEntityManager:
                     sys.exit(1)
                 
             if h == track_hash:
-                self.node.get_logger().info(f"Pálya Felszínen (Látható): {model_name}")
+                self.node.get_logger().info(f"Track on Surface (Visible): {model_name}")
                 
         self.current_visible_track = track_hash
         import time
-        # Hagyunk egy nagyon pici időt a frissülésnek, hogy a kamera érzékelje
         time.sleep(0.1)

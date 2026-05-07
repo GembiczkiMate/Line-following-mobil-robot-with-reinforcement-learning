@@ -13,10 +13,10 @@ def main():
     rclpy.init()
     
     print("==================================================")
-    print(" VÉGTELEN TESZTELÉS (INFERENCE / DEPLOYMENT) INDÍTÁSA")
+    print(" INFINITE TESTING (INFERENCE / DEPLOYMENT) STARTING")
     print("==================================================")
-    print("Ebben a módban a robot végtelen ideig próbálkozik a befejezett pályákon.")
-    print("Nyomj CTRL+C -t a leállításhoz!")
+    print("In this mode, the robot will keep trying indefinitely on the completed tracks.")
+    print("Press CTRL+C to stop!")
     print("==================================================\n")
 
     # Create the environment in testing mode
@@ -29,27 +29,28 @@ def main():
     model_path = os.path.join(save_dir, "model.zip")
     
     if not os.path.exists(model_path):
-        print(f"Hiba: Nincs kész modell. Kélek előbb taníts be egyet!")
+        print(f"Error: Trained model not found at: {model_path}")
+        print("Please start training first and wait for the model to be saved!")
         return
         
-    print("Modell betöltése...")
+    print(f"Loading: {model_path}...")
     model = PPO.load(model_path, env=env)
     
     try:
         obs, info = env.reset()
         while True:
-            # Csak kigenerálja a mozdulatot az eddigi TUDÁSA (nem próbálgathat új dolgokat -> deterministic=True)
+            # Only generate actions based on the model's current knowledge (cannot explore new actions -> deterministic=True)
             action, _states = model.predict(obs, deterministic=True)
             
             obs, reward, terminated, truncated, info = env.step(action)
             
-            # Ha felborul vagy beér, új pályát kérünk, hadd tekerjen a végtelenségig
+            # If terminated or truncated, reset the environment to start a new episode on a new track. The robot will keep trying indefinitely until the user stops it with CTRL+C.
             if terminated or truncated:
-                print(" -> Epizód vége! Újraindítás...")
+                print(" -> Episode ended! Restarting...")
                 obs, info = env.reset()
                 
     except KeyboardInterrupt:
-        print("\n\nKilépés a felhasználó kérésére...")
+        print("\n\nExiting on user request...")
     finally:
         env.close()
 

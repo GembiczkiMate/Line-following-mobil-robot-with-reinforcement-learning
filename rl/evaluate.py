@@ -16,19 +16,18 @@ def main():
     rclpy.init()
     
     print("==================================================")
-    print(" VALIDÁCIÓ (KIPRÓBÁLÁS STATISZTIKÁKKAL) INDÍTÁSA")
+    print(" VALIDATION (EVALUATION WITH STATISTICS) STARTING")
     print("==================================================")
 
-    # Létrehozzuk a környezetet a Validációhoz (ugyanaz a Gazebo pálya)
-    # Itt is_testing_mode=False azért kell, hogy azokon a pályákon értékelje ki magát,
-    # amiken a betanítás is zajlott. A modell itt már Hálózatot nem frissít, csak prediktál!
+    # Create the environment for validation (same Gazebo track)
+    # Here is_testing_mode=False is required so that it evaluates itself on the tracks
+    # where training also took place. The model here no longer updates the network, it only predicts!
     env = RosLineFollowEnv(is_testing_mode=False, reward_mode=args.reward_mode)
     env.sequential_mode = True # Sorban menjen végig
     env.current_track_index = 0 # Kezdje a legelsővel
-    env.sequential_mode = True # Sorban menjen végig
-    env.current_track_index = 0 # Kezdje a legelsővel
     
-    # Megkeressük az elmentett modellfájlt (model.zip) a mapparendszerben
+    
+    # Set PPO hyperparameters (these should match the ones used during training for a fair evaluation)
     package_share_dir = get_package_share_directory('two_wheeled_robot')
     workspace_dir = '/media/gembi/4a3cde59-7329-4c35-983a-99689c6819c0/rl_ros/src/two_wheeled_robot'
     folder_name = f"ppo_line_follower_{args.reward_mode}"
@@ -36,21 +35,21 @@ def main():
     model_path = os.path.join(save_dir, "model.zip")
     
     if not os.path.exists(model_path):
-        print(f"Hiba: Nem találtam betanított modellt itt: {model_path}")
-        print("Előbb indítsd el a tanítást és várd meg a modell első mentését!")
+        print(f"Error: Trained model not found at: {model_path}")
+        print("Please start training first and wait for the model to be saved!")
         return
         
-    print(f"Betöltés: {model_path}...")
-    # Betöltjük a mesterséges intelligenciát a korábban tanult "súlyokkal" (tudással)
+    print(f"Loading: {model_path}...")
+    # Load the trained model with the previously learned "weights" (knowledge)
     model = PPO.load(model_path, env=env)
     
-    NUM_EPISODES = len(env.PREDEFINED_TRACKS)  # Pontosan egyszer menjen végig minden pályán!
+    NUM_EPISODES = len(env.PREDEFINED_TRACKS)  
     total_rewards = []
     success_count = 0
     
-    print(f"\nA modell validálása {NUM_EPISODES} véletlenszerű epizódon (pályán) keresztül...")
+    print(f"\nEvaluating the model on {NUM_EPISODES} random episodes (tracks)...")
     
-    # 10 epizódon keresztül lefuttatja
+    # Run for 10 episodes (each episode is a full run on a track until it finishes or fails)
     for episode in range(NUM_EPISODES):
         obs, info = env.reset()
         done = False
@@ -58,33 +57,33 @@ def main():
         steps = 0
         
         while not done:
-            # DETERMINISTIC=TRUE -> Ez a legfontosabb! Itt már NEM tanul, NEM próbálkozik véletlenszerű dolgokkal, csak "robot módjára" a legtöbb pontot akarja kapni a tudása alapján.
+            
             action, _states = model.predict(obs, deterministic=True)
             
-            # A mozgást belerakja a Gazebóba
+            #  Take the action in the environment and observe the result
             obs, reward, terminated, truncated, info = env.step(action)
             episode_reward += reward
             steps += 1
             
             done = terminated or truncated
             
-            # Megnézzük a végén leesett-e, vagy sikeresen megkapta a célvonal bónuszát
-            if done and reward >= env.FINISH_REWARD - 50: # Hozzávetőleges check, ha a büntetés ellenére még így is magas a jutalma a cél miatt
+            # Check if the episode ended due to falling off or successfully reaching the goal line bonus
+            if done and reward >= env.FINISH_REWARD - 50: # Approximate check, if the reward is still high despite penalties due to reaching the goal
                 success_count += 1
                 
         total_rewards.append(episode_reward)
-        print(f"Epizód {episode + 1}/{NUM_EPISODES} - Lépések száma: {steps} - Késői pont (Jutalom): {episode_reward:.2f}")
+        print(f"Episode {episode + 1}/{NUM_EPISODES} - Steps: {steps} - Final Reward: {episode_reward:.2f}")
         
-    # Eredmények kiszámolása (statisztika)
+    # Calculate results (statistics)
     mean_reward = np.mean(total_rewards)
     std_reward = np.std(total_rewards)
     success_rate = (success_count / NUM_EPISODES) * 100
     
     print("\n" + "="*40)
-    print(" VALIDÁCIÓ EREDMÉNYEI (EVALUATION)")
+    print(" EVALUATION RESULTS")
     print("="*40)
-    print(f"Átlagos Jutalom:  {mean_reward:.2f} +/- {std_reward:.2f}")
-    print(f"Sikerességi ráta: {success_rate:.1f}% (10-ből {success_count}x célba ért be!)")
+    print(f"Average Reward:  {mean_reward:.2f} +/- {std_reward:.2f}")
+    print(f"Success Rate: {success_rate:.1f}% ({success_count} out of {NUM_EPISODES} reached the goal!)")
     print("="*40)
     
     env.close()

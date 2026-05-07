@@ -1,37 +1,38 @@
 #!/bin/bash
 
-# A Cyclone DDS hálózati réteg engedélyezése az instabilitások és szerviz fagyások elkerülése végett
+# Enabling the Cyclone DDS network layer to prevent instabilities and service hangs
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export ROS_LOCALHOST_ONLY=1
-export ROS_DOMAIN_ID=42  # Teljes elszigetelés a háttérben futó egyéb hálózatoktól
+export ROS_DOMAIN_ID=42  # Full isolation from faulty DDS packages running in the background
 
 echo "========================================================="
-echo " EVALUATION (VALIDÁCIÓ) - STATISZTIKA GYŰJTÉS NYITOTT GAZEBÓVAL"
+echo " EVALUATION (VALIDATION) - STATISTICS COLLECTION WITH OPEN GAZEBO"
 echo "========================================================="
 echo ""
-echo "Melyik modellt (jutalmazási rendszert) szeretnéd betölteni és kiértékelni?"
-echo "1) Kamerás kép alapján (Vision - eredeti verzió)"
-echo "2) Pálya koordinátái alapján (Coordinate - spline mérés)"
+echo "Which model (reward system) would you like to load and evaluate?"
+echo "1) Based on camera image (Vision - original version)"
+echo "2) Based on track coordinates (Coordinate - spline measurement)"
 while true; do
-    read -p "Választásod (1/2): " REWARD_CHOICE
+    read -p "Your choice (1/2): " REWARD_CHOICE
     case $REWARD_CHOICE in
         1) REWARD_MODE="vision"; break;;
         2) REWARD_MODE="coordinate"; break;;
-        *) echo "Kérlek, válassz érvényes opciót (1 vagy 2).";;
+        *) echo "Please choose a valid option (1 or 2).";;
     esac
 done
 
 echo ""
-echo "=> Kiválasztott mód: $REWARD_MODE (Meg fog nyílni a Gazebo)"
+echo "=> Selected mode: $REWARD_MODE (Gazebo will open)"
 
 # Source the ROS 2 setup configuration
 source install/setup.bash
 
-echo "Meglévő ROS 2 démonok tisztítása az RMW konfliktusok (C++ Crash -6) ellen..."
+echo "Cleaning up existing ROS 2 daemons to prevent RMW conflicts (C++ Crash -6)..."
+
 ros2 daemon stop
 sleep 1
 
-echo "Starting Gazebo Simulation (Látható / GUI ablakban)..."
+echo "Starting Gazebo Simulation (Visible / GUI mode)..."
 # Start Gazebo in the background WITH HEADLESS FALSE explicitly
 export GAZEBO_HEADLESS="False"
 ros2 launch two_wheeled_robot load_world_into_gazebo.launch.py headless:=False &
@@ -41,7 +42,7 @@ echo "Waiting for 3 seconds to let Gazebo initialize (especially for GUI mode)..
 sleep 3
 
 echo "Starting Model Evaluation (Validation) for $REWARD_MODE..."
-# Futtatjuk az evaluate.py fájlt, átadva a kiválasztott jutalmazási módot
+# Run the evaluate.py file, passing the selected reward mode
 python3 $(ros2 pkg prefix two_wheeled_robot)/share/two_wheeled_robot/rl/evaluate.py --reward-mode $REWARD_MODE
 
 # When it finishes

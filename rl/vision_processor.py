@@ -7,13 +7,12 @@ class VisionProcessor:
         self.img_width = img_width
         self.reward_mode = reward_mode
         
-        # Dinamikus küszöbértékek a mód alapján
+        # Dynamic thresholds based on the mode
         if self.reward_mode == 'coordinate':
             self.min_line_area = 80
             self.max_deviation_ratio = 0.4
         else:
-            # Szigorúbb vision mód beállítások: a kép közepétől csak 35%-ot térhet el
-            # és legalább 150 pixel területet kell lásson a piros vonalból
+            #Vision mode more sensitive to line visibility, so we use stricter thresholds
             self.min_line_area = 150
             self.max_deviation_ratio = 0.35
         

@@ -11,30 +11,30 @@ TIMEOUT_LIMIT=120       # Hány másodperc elérhetetlenség után lője ki (120
 CHECK_INTERVAL=10       # Hány másodpercenként csekkolja a rendszert
 
 echo "*********************************************************"
-echo "* FELÜGYELT TRÉNING (WATCHDOG) ELINDÍTVA                *"
-echo "* Automatikus újraindítás fagyás vagy leállás esetén. *"
+echo "* SUPERVISED TRAINING (WATCHDOG) STARTED                *"
+echo "* Automatic restart in case of hang or crash.         *"
 echo "*********************************************************"
 echo ""
-echo "Milyen jutalmazási rendszerrel szeretnéd a tanítást futtatni?"
-echo "1) Kamerás kép alapján (Vision - eredeti verzió)"
-echo "2) Pálya koordinátái alapján (Coordinate - fizikai spline mérés)"
-read -p "Választásod (1/2): " REWARD_CHOICE
+echo "Which reward system would you like to use for training?"
+echo "1) Based on camera image (Vision - original version)"
+echo "2) Based on track coordinates (Coordinate - physical spline measurement)"
+read -p "Your choice (1/2): " REWARD_CHOICE
 
-# Exportáljuk környezeti változóként, amit a következő threadek (launch fileok) is látnak majd
+# Export as an environment variable, which will be visible to the next threads (launch files)
 export TRAIN_REWARD_MODE="vision"
 if [ "$REWARD_CHOICE" == "2" ]; then
     export TRAIN_REWARD_MODE="coordinate"
-    echo "[WATCHDOG] A matematikai (Coordinate) mód lett beállítva."
+    echo "[WATCHDOG] The mathematical (Coordinate) mode has been set."
 else
-    echo "[WATCHDOG] A vizuális (Vision) mód lett beállítva."
+    echo "[WATCHDOG] The visual (Vision) mode has been set."
 fi
 echo ""
-echo "Szeretnéd nyomon követni a szimulációt képpel? (A rejtett Headless mód sokkal gyorsabb!)"
-echo "1) Igen (Látható Gazebo GUI, Watchdog figyeli a szervizek fagyását is)"
-echo "2) Nem  (Gyors Rejtett Gazebo, Watchdog csak Python szintű fagyást néz)"
-read -p "Választásod (1/2): " WATCH_GAZEBO
+echo "Would you like to monitor the simulation visually? (Headless mode is much faster!)"
+echo "1) Yes (Visible Gazebo GUI, Watchdog monitors service hangs as well)"
+echo "2) No  (Fast Headless Gazebo, Watchdog only monitors Python-level hangs)"
+read -p "Your choice (1/2): " WATCH_GAZEBO
 
-# Ha látni akarja, kikapcsoljuk a headless-t
+# If the user wants to watch Gazebo, we set headless to False, otherwise True for faster performance
 if [ "$WATCH_GAZEBO" == "1" ]; then
     export GAZEBO_HEADLESS="False"
 else
@@ -45,8 +45,8 @@ echo "====================================================="
 cleanup_and_exit() {
     echo ""
     echo "====================================================="
-    echo "[WATCHDOG] Kézi leállítás (Ctrl+C) észlelve!"
-    echo "[WATCHDOG] Minden folyamat végleges leállítása és kilépés..."
+    echo "[WATCHDOG] Manual shutdown (Ctrl+C) detected!"
+    echo "[WATCHDOG] Terminating all processes and exiting..."
     echo "====================================================="
     pkill -SIGINT -f train.py 2>/dev/null
     sleep 3
@@ -57,35 +57,35 @@ cleanup_and_exit() {
     exit 0
 }
 
-# A Ctrl+C (SIGINT) és SIGTERM jelek elfogása, hogy ne induljon újra
+# Trap Ctrl+C (SIGINT) and SIGTERM signals to prevent automatic restart
 trap cleanup_and_exit SIGINT SIGTERM
 
 while true; do
     echo "====================================================="
-    echo "[WATCHDOG] Új tréning munkamenet indítása..."
+    echo "[WATCHDOG] Starting a new training session..."
     echo "====================================================="
     
     rm -f /tmp/gazebo_fatal_error.flag
     
-    # A tréning szkript elindítása a háttérben
+    # Start the training script in the background
     bash ./start_training.sh &
     MAIN_PID=$!
     
-    # Indulás után adunk neki egy kis időt, amin belül normális, hogy még nincs service
-    echo "[WATCHDOG] Várakozás a rendszerek betöltésére (45 másodperc)..."
+    # After starting, give it some time, during which it's normal that the service is not yet available
+    echo "[WATCHDOG] Waiting for systems to initialize (45 seconds)..."
     sleep 45
     
     HANG_TIMER=0
     
-    # Belső ciklus, ami addig fut, amíg a start_training.sh él a háttérben
+    # Inner loop that runs as long as start_training.sh is alive in the background
     while kill -0 $MAIN_PID 2>/dev/null; do
         
-        # Gyorsabb ellenőrzés a Python szkript felől küldött FATAL hibáról
+        # Faster check for FATAL errors sent from the Python script
         if [ -f "/tmp/gazebo_fatal_error.flag" ]; then
             echo "====================================================="
-            echo "[WATCHDOG] Olyan jelzést kaptunk a Python kód felől, hogy a robot respawn"
-            echo "           több próbálkozás (attempt) alapján sem sikerült!"
-            echo "[WATCHDOG] Folyamatok azonnali lelövése és újraindítása..."
+            echo "[WATCHDOG] Received a signal from the Python code that the robot respawn"
+            echo "           failed after multiple attempts!"
+            echo "[WATCHDOG] Terminating processes immediately and restarting..."
             echo "====================================================="
             rm -f /tmp/gazebo_fatal_error.flag
             pkill -SIGINT -f train.py 2>/dev/null
@@ -98,22 +98,21 @@ while true; do
             break
         fi
         
-        # Lekérdezzük a /spawn_entity szervizt egy 10 másodperces időkorláttal
-        # Ha a Gazebo kifagy, ez a hívás beáll vagy hibát dob
+        # If Gazebo hangs, this call will either hang or throw an error
         if [ "$WATCH_GAZEBO" == "1" ]; then
-            # Helyes módszer a Gazebo életbenlétének ellenőrzésére
+            # Corrected the service name to /gazebo/describe_parameters which is a more general service that should be available even if spawn_entity is not responding
             if timeout 15 ros2 service call /gazebo/describe_parameters rcl_interfaces/srv/DescribeParameters "{}" > /dev/null 2>&1; then
-                HANG_TIMER=0  # Minden rendben, a számláló nullázódik
+                HANG_TIMER=0  
             else
                 HANG_TIMER=$((HANG_TIMER + CHECK_INTERVAL))
-                echo "[WATCHDOG] FIGYELEM: A szimulátor nem válaszol $HANG_TIMER másodperce..."
+                echo "[WATCHDOG] WARNING: The simulator has not responded for $HANG_TIMER seconds..."
             fi
             
-            # Ha a kifagyás meghaladta a megengedett 4 percet
+            # If the timer exceeds the limit, we consider it a critical hang and restart everything
             if [ $HANG_TIMER -ge $TIMEOUT_LIMIT ]; then
                 echo "====================================================="
-                echo "[WATCHDOG] KRITIKUS: A szimuláció végleg lefagyott (>$TIMEOUT_LIMIT mp)!"
-                echo "[WATCHDOG] Folyamatok azonnali lelövése és újraindítása..."
+                echo "[WATCHDOG] CRITICAL: The simulation has completely hung (>$TIMEOUT_LIMIT seconds)!"
+                echo "[WATCHDOG] Terminating processes immediately and restarting..."
                 echo "====================================================="
                 
                 pkill -SIGINT -f train.py 2>/dev/null
