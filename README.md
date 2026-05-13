@@ -33,6 +33,8 @@ export ROS_DOMAIN_ID=42
 
 Ezek azért szükségesek mivel leválasztottam a gazebo szerveréről a projektet, így egyszere egy hálózaton több szmuláció is futtatható. Ezt követően az `rqt` paranccsal tudjuk nézzzni a kameraképet a `Plugins--> Visualization--> Image View` pont alatt.
 
+Amennyiben nincs még feltanított modell, akkor létre fog hozni a rendszer egyet. Abban az esetben, ha van modell de újra szeretnénk kezdeni a tanítást módtól függően a `ppo_line_follower_vision` vagy `ppo_line_follower_coordinate` mappát vagy kitöröljük, vagy áthelyezzük.
+
 # Paraméterek állítása és monitorozás
 ## Paraméterek
 A tanítás sikerességéhez szükség lesz időnként változtatni a PPO algoritmus hiperparaméterein, amikre főként ügyelni kell a következők:
@@ -53,7 +55,7 @@ tensorboard --logdir ppo_line_follower_vision
 a képfeldolgozó módhoz, vagy
 
 ```
-tensorboard --logdir ppo_line_follower_vision
+tensorboard --logdir ppo_line_follower_coordinate
 ```
 a koordináta módhoz. Itt a `SCALARS` fülre kattintava és a bal oltalon az `Ignore outliers in chart scaling` pipát kivéve látszódni fognak a gráfok amiből a legfntosabbak:
 + `ep_rew_mean`, ami az epizódonkénti átlag jutamat mutatja
