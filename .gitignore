@@ -8,5 +8,6 @@ log/
 # Egy konkrét fájl kihagyása
 to_do.txt
 # Modell mentési mappák kihagyása
-ppo_line_follower*/
-ppo_line_follower/
+
+ppo_line_follower_coordinate/model.zip
+ppo_line_follower_vision/model.zip

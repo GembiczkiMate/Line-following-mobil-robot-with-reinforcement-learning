@@ -1,2 +1,1 @@
-ppo_line_follower_coordinate filter=lfs diff=lfs merge=lfs -text
-ppo_line_follower_vision filter=lfs diff=lfs merge=lfs -text
+*.zip filter=lfs diff=lfs merge=lfs -text
